@@ -10,27 +10,31 @@
 #SBATCH --cpus-per-task=2
 #SBATCH --partition=common
 
-# Input file path
+#set input file path
 input_file="/hpc/group/vilgalyslab/lal76/databases/merops_scan_peptidase_only.lib"
 
-# Output file name
+#set output file name
 output_file="merops_anno_map.txt"
 
-# Process the file
+#parse the headers
 awk '
 /^>/ {
     #extract the first word after ">"
     first_word = substr($1, 2)  # Remove the ">" character
-
+    
     #find the position of " - " and " ("
     start = index($0, " - ") + 3
     end = index($0, " (")
-
+    
     #extract the text between " - " and " ("
     description = substr($0, start, end - start)
-
-    #print the result
-    print first_word "\t" description
+    
+    #extract the content inside square brackets
+    match($0, /\[(.*?)\]/)
+    bracket_content = substr($0, RSTART+1, RLENGTH-2)
+    
+    #print results
+    print first_word "\t" description "\t" bracket_content
 }
 ' "$input_file" > "$output_file"
 
