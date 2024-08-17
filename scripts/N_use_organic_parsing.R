@@ -24,7 +24,7 @@ library(ape)
 library(phytools)
 library(ggplot2)
 library(ggpubr)
-library(vegan)
+#library(vegan)
 library(quadprog)
 library(devtools)
 library(phangorn)
@@ -46,7 +46,7 @@ setwd("~/Desktop/Project_N_use")
 OF.gene_families<-as.data.frame(fread("Orthogroups.tsv")) #main OG file
 OF.unassigned<- as.data.frame(fread("Orthogroups_UnassignedGenes.tsv")) #singleton OGs
 MEROPS<- as.data.frame(fread("data/MEROPS.OUT.PEPTIDASE.aa.fasta", header = FALSE, sep = "\t")) #MEROPS BLASTP results
-names(MEROPS)<- c("Orthogroup", "sseqid", "pident", "length", "mismatch", "gapopen", "qstart", "qend", "start", "send", "evalue", "bitscore")
+names(MEROPS)<- c("Orthogroup", "sseqid", "pident", "length", "mismatch", "gapopen", "qstart", "qend", "sstart", "send", "evalue", "bitscore", "qlen", "slen")
 MEROPS_anno<-as.data.frame(fread("data/merops_anno_map.txt", header = FALSE)) #this was generated from subsetting the fasta headers of the MEROPS scan database, using the scrip N_USE_PROT_02_make_annotation_map_for_MEROPS.sh
 names(MEROPS_anno)<- c("sseqid","anno", "MEROPS_ID")
 CAZy<- as.data.frame(fread("CAZYs_all.csv")) #CAZymes as annotated by the JGI pipeline 
@@ -59,6 +59,21 @@ names_df<- data.frame(cbind(JGI_code = c("Suicli1", "Suipic1", "Suiame1", "Suigr
 
 
 ### Clean and process Data ###
+#BLASTP filtering for MEROPS
+#add query coverage column
+MEROPS$query_coverage <- (MEROPS$length / MEROPS$qlen) * 100
+#round query coverage to nearest whole
+MEROPS$query_coverage <- round(MEROPS$query_coverage, 0)
+
+##subset results to only those that pass QC params -note this is already only displaying results with evalue <1.0e-10
+#only those with query coverage > 80%
+nrow(MEROPS) #2,168
+MEROPS_qcov <- MEROPS[MEROPS$query_coverage >70, ]
+nrow(MEROPS_qcov) #919
+#only those with percent sequence identify >40%
+MEROPS_qcov_pident <- MEROPS_qcov[MEROPS_qcov$pident >40, ]
+nrow(MEROPS_qcov_pident) #172
+
 
 #combine OF families with singletons
 OF.gene_families_all<- rbind(OF.gene_families, OF.unassigned)
@@ -124,21 +139,21 @@ n_gene_fams_singletons
 
 ##pan-genus conservation analysis
 #subset MEROPS hits to only the top hit per OG
-MEROPS_top_hits<- MEROPS %>%
+MEROPS_top_hits<- MEROPS_qcov_pident %>%
   group_by(Orthogroup) %>%
   slice(which.min(evalue)) %>%
   ungroup()
 
 #subset OGs to only those with BLAST hits to MEROPS database
 MEROPS_subset<- semi_join(OF.gene_families_all, MEROPS_top_hits, by = "Orthogroup")
-nrow(MEROPS_subset) #there are 342 OGs with hits to the MEROPS database. 
+nrow(MEROPS_subset) #there are 88 OGs with hits to the MEROPS database. 
 
 #how many conserved? (core MEROPS)
 total_core<- sum(MEROPS_subset$number_genomes_all == 6)
-total_core #224 
+total_core #36 
 nrow(MEROPS_subset) - total_core #so 118 are singletons or accessory 
 total_singletons<- sum(MEROPS_subset$number_genomes_all == 1)
-total_singletons #76 singles
+total_singletons #40 singles
 
 #order species by abundance of Prot genes
 cols_to_exclude<- c("Orthogroup", "number_genomes_all")
@@ -167,31 +182,23 @@ singles_only<-no_core[rowSums(no_core) == 1,]
 core_only<- MEROPS_subset_counts_only_ones_num[rowSums(MEROPS_subset_counts_only_ones_num) == 6,]
 rowSums(core_only)
 
-##get MEROPS gene counts per species 
-counts_overall<- colSums(MEROPS_subset_counts_only_ones_num)
-sort(counts_overall)
-
-#S. luteus   S. ampliporus   S. americanus     S. weaverae S. clintonianus     S. spraguei 
-#252             253             255             255             260             302 
-
-
 #core MEROPS genes only
 counts_core<- colSums(core_only)
-sort(counts_core) #224 are conserved completely (core)
+sort(counts_core) #36 are conserved completely (core)
 
 #accessory MEROPS genes only
 counts_acessory<- colSums(no_core_or_singles)
 sort(counts_acessory)
 
-#S. spraguei       S. luteus   S. ampliporus   S. americanus S. clintonianus     S. weaverae 
-#18              24              25              30              30              30 
+#S. ampliporus       S. luteus     S. spraguei   S. americanus S. clintonianus     S. weaverae 
+#6               6               6               7               8               8
 
 #singletons only
 counts_singles<- colSums(singles_only)
 sort(counts_singles)
 
-#S. americanus     S. weaverae   S. ampliporus       S. luteus S. clintonianus     S. spraguei 
-#1               1               4               4               6              60 
+#S. weaverae   S. americanus S. clintonianus       S. luteus   S. ampliporus     S. spraguei 
+#0               1               1               2               3              33 
 
 
 ###compile counts for graphing 
@@ -408,9 +415,18 @@ Metallo_col_scale = colorRamp2(c(min(Metallo)-2, max(Metallo)), c("#FFFFFF", "#5
 Serine_col_scale = colorRamp2(c(min(Serine)-2, max(Serine)), c("#FFFFFF", "#D9AF62"))
 Threonine_col_scale = colorRamp2(c(min(Threonine)-2, max(Threonine)), c("#FFFFFF", "#604A70"))
 
+#total MEROPS genes per family
+per_family<- colSums(MEROPS_counts1)
+per_family
 
-colSums(MEROPS_counts1)
+#total MEROPS genes overall
+sum(per_family)
 
+#total by species
+per_species<- sort(rowSums(MEROPS_counts1))
+per_species
+
+#fix col names
 MEROPS_names2<- colnames(MEROPS_counts1)
 desired_column_order <- c("Aspartic", "Cysteine", "Metallo", "Serine", "Threonine")
 
@@ -624,7 +640,7 @@ polyporopepsin_fig
 #dev.off()
 
 
-### some quick stats about polyporopepsin ##
+### some quick stats about polyporopepsin and MEROPS protein totals##
 
 #extract S. spraguei
 S_spra_polyporopepsin <- polyporopepsin["S. spraguei", ]
@@ -634,8 +650,7 @@ non_zero_count <- sum(S_spra_polyporopepsin != 0)
 non_zero_count
 ncol(polyporopepsin)
 
-#How many overall?
-MEROPS_anno_counts
+##How many overall?
 
 #remove the family_text col to get totals
 MEROPS_anno_counts_numonly <- MEROPS_anno_counts %>%
@@ -649,7 +664,6 @@ sum(colSums(MEROPS_anno_counts_numonly, na.rm = TRUE))
 
 #by catalytic mechanism
 sort(colSums(MEROPS_counts1))
-
 
 
 
@@ -1155,4 +1169,3 @@ ea_sp<- rowSums(chitin_CAZyme_counts)
 sort(ea_sp)
 #S. weaverae       S. luteus   S. americanus S. clintonianus   S. ampliporus     S. spraguei 
 #67              74              77              81              82              93 
-
