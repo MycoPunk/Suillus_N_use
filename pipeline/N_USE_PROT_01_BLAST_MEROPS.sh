@@ -36,4 +36,4 @@ if [ -z $CPUS ]; then
 fi
 
 #run blastp
-blastp -query $INFILE -db $MEROPS_DB/merops_scan_peptidase_only.lib -out MEROPS.OUT.PEPTIDASE.aa.fasta -num_threads $CPUS -seg yes -soft_masking true -max_target_seqs $N_RESULTS -evalue $QC_CUTOFF -outfmt 6 -use_sw_tback
+blastp -query $INFILE -db $MEROPS_DB/merops_scan_peptidase_only.lib -out MEROPS.OUT.PEPTIDASE.aa.fasta -num_threads $CPUS -seg yes -soft_masking true -max_target_seqs $N_RESULTS -evalue $QC_CUTOFF -use_sw_tback -outfmt "6 qseqid sseqid pident length mismatch gapopen qstart qend sstart send evalue bitscore qlen slen"
