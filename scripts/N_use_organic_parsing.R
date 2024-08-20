@@ -64,15 +64,23 @@ names_df<- data.frame(cbind(JGI_code = c("Suicli1", "Suipic1", "Suiame1", "Suigr
 MEROPS$query_coverage <- (MEROPS$length / MEROPS$qlen) * 100
 #round query coverage to nearest whole
 MEROPS$query_coverage <- round(MEROPS$query_coverage, 0)
+#add subject coverage column
+MEROPS$subject_coverage <- (MEROPS$length / MEROPS$slen) * 100
+#round subject coverage to nearest whole
+MEROPS$subject_coverage <- round(MEROPS$subject_coverage, 0)
+
 
 ##subset results to only those that pass QC params -note this is already only displaying results with evalue <1.0e-10
-#only those with query coverage > 80%
+#only those with query coverage > 70%
 nrow(MEROPS) #2,168
 MEROPS_qcov <- MEROPS[MEROPS$query_coverage >70, ]
 nrow(MEROPS_qcov) #919
+#only those with subject coverage > 70%
+MEROPS_scov <- MEROPS_qcov[MEROPS_qcov$subject_coverage >70, ]
+nrow(MEROPS_scov) #809
 #only those with percent sequence identify >40%
-MEROPS_qcov_pident <- MEROPS_qcov[MEROPS_qcov$pident >40, ]
-nrow(MEROPS_qcov_pident) #172
+MEROPS_qcov_pident <- MEROPS_scov[MEROPS_scov$pident >40, ]
+nrow(MEROPS_qcov_pident) #120
 
 
 #combine OF families with singletons
@@ -190,15 +198,10 @@ sort(counts_core) #36 are conserved completely (core)
 counts_acessory<- colSums(no_core_or_singles)
 sort(counts_acessory)
 
-#S. ampliporus       S. luteus     S. spraguei   S. americanus S. clintonianus     S. weaverae 
-#6               6               6               7               8               8
-
 #singletons only
 counts_singles<- colSums(singles_only)
 sort(counts_singles)
 
-#S. weaverae   S. americanus S. clintonianus       S. luteus   S. ampliporus     S. spraguei 
-#0               1               1               2               3              33 
 
 
 ###compile counts for graphing 
@@ -419,12 +422,17 @@ Threonine_col_scale = colorRamp2(c(min(Threonine)-2, max(Threonine)), c("#FFFFFF
 per_family<- colSums(MEROPS_counts1)
 per_family
 
+#Aspartic  Cysteine   Metallo    Serine Threonine 
+#410        12        82       100        67 
+
 #total MEROPS genes overall
 sum(per_family)
 
 #total by species
 per_species<- sort(rowSums(MEROPS_counts1))
 per_species
+#S. weaverae       S. luteus   S. americanus S. clintonianus   S. ampliporus     S. spraguei 
+#46              51              64              66              81             363 
 
 #fix col names
 MEROPS_names2<- colnames(MEROPS_counts1)
@@ -635,9 +643,9 @@ polyporopepsin_fig <- Heatmap(
 #print the heatmap
 polyporopepsin_fig
 
-#pdf("polyporopepsin_fig.pdf", width = 18, height = 4)
-#draw(polyporopepsin_fig)
-#dev.off()
+pdf("polyporopepsin_fig.pdf", width = 18, height = 4)
+draw(polyporopepsin_fig)
+dev.off()
 
 
 ### some quick stats about polyporopepsin and MEROPS protein totals##
@@ -650,8 +658,10 @@ non_zero_count <- sum(S_spra_polyporopepsin != 0)
 non_zero_count
 ncol(polyporopepsin)
 
-##How many overall?
+##How many polyporopepsin per species
+rowSums(polyporopepsin)
 
+#how many MEROPS genes 
 #remove the family_text col to get totals
 MEROPS_anno_counts_numonly <- MEROPS_anno_counts %>%
   select(-family_text)
@@ -1169,3 +1179,4 @@ ea_sp<- rowSums(chitin_CAZyme_counts)
 sort(ea_sp)
 #S. weaverae       S. luteus   S. americanus S. clintonianus   S. ampliporus     S. spraguei 
 #67              74              77              81              82              93 
+
