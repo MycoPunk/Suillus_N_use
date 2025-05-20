@@ -46,6 +46,7 @@ fungus_colors <- c(
 
 #read in data
 data<- as.data.frame(fread("data/N_use_bioassay_clean_data.csv", header = TRUE, sep = ",")) #MEROPS BLASTP results
+tree<- read.tree("Suillus.6_taxa.iqtree") #read in tree
 
 #get current raw names
 unique(data$Species)
@@ -144,7 +145,9 @@ time_shapes <- rep(15:25, length.out = length(time_points))
 names(time_shapes) <- as.character(time_points)
 
 #set species order
-species_order <- sort(unique(no_control_normalized_filtered$Species))
+#species_order <- sort(unique(no_control_normalized_filtered$Species))
+#put in order on the tree (top to bottom)
+species_order <-c("S. spraguei", "S. americanus", "S. weaverae", "S. luteus", "S. clintonianus", "S. ampliporus")
 
 #filter data for each treatment
 ammonium_data <- no_control_normalized_filtered %>% filter(Treatment == "Ammonium")
@@ -152,6 +155,13 @@ bsa_data <- no_control_normalized_filtered %>% filter(Treatment == "BSA")
 bsa_tannin_data <- no_control_normalized_filtered %>% filter(Treatment == "BSA-Tannin")
 chitin_data <- no_control_normalized_filtered %>% filter(Treatment == "Chitin")
 
+# Pre-calculate segment positions for the lollipop plot
+segment_data <- no_control_normalized_filtered %>%
+  group_by(Species, `Time (days post inoculation)`, Treatment) %>%
+  # Calculate the mean x value (biomass) for each group to draw the segments to
+  summarise(mean_x = mean(mass_minus_plug_normalized, na.rm = TRUE), .groups = "drop") %>%
+  # Create y values as factors in the desired order for plotting
+  mutate(y = factor(Species, levels = rev(species_order)))
 #filter segment for each treatment
 ammonium_segments <- segment_data %>% filter(Treatment == "Ammonium")
 bsa_segments <- segment_data %>% filter(Treatment == "BSA")
@@ -253,12 +263,12 @@ direct_legend <- ggplot() +
 
 #use cowplot to stack them
 final_plot <- plot_grid(
-  top_row,                    # The combined row of 4 plots
-  direct_legend,              # The legend plot
-  ncol = 1,                   # Stack vertically
-  rel_heights = c(10, 2),     # Relative heights (legend smaller)
-  align = 'v',                # Align vertically
-  axis = 'lr'                 # Align left and right edges
+  top_row,                    #the combined row of 4 plots
+  direct_legend,              #the legend plot
+  ncol = 1,                   #stack vertically
+  rel_heights = c(10, 2),     #relative heights (legend smaller)
+  align = 'v',                #align vertically
+  axis = 'lr'                 #align left and right edges
 )
 
 
