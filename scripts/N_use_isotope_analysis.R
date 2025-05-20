@@ -13,6 +13,7 @@
 
 #set packages 
 library(data.table)
+library(dplyr)
 library(tidyverse)
 library(ggtree)
 library(ape)
@@ -34,7 +35,7 @@ sessionInfo()
 set.seed(666)
 
 #set wd
-setwd("~/Project_N_use/")
+setwd("~/Desktop/Project_N_use/")
 
 #read in the data
 data<- as.data.frame(fread("data/N_use_isotopes.csv", header = TRUE, sep = ",")) #note, this data sheet supplied by Talia includes data collected from WA, which is not being included in this analysis. 
@@ -106,7 +107,7 @@ names_df<- data.frame(cbind(raw_name = c("Suillus clintonianus", "Suillus spragu
 rename_vector <- setNames(names_df$manuscript_name, names_df$raw_name)
 #rename the names column 
 data_filtered_fungi_clean <- data_filtered_fungi_clean %>%
-  mutate(species = recode(species, !!!rename_vector))
+  mutate(species = dplyr::recode(species, !!!as.list(rename_vector)))
 #check that is worked
 data_filtered_fungi_clean$species #looks good. 
 
@@ -115,9 +116,9 @@ names_df2<- data.frame(cbind(raw_name = c("Larix laricina", "Pinus resinosa", "P
                             manuscript_name = c("L. laricina", "P. resinosa", "P. strobus")))
 #turn the df into a named vector
 rename_vector2 <- setNames(names_df2$manuscript_name, names_df2$raw_name)
-#rename the nams column 
+#rename the names column 
 data_filtered_host <- data_filtered_host %>%
-  mutate(species = recode(species, !!!rename_vector2))
+  mutate(species = dplyr::recode(species, !!!as.list(rename_vector2)))
 #check
 data_filtered_host$species #looks good. 
 
@@ -583,7 +584,7 @@ p_fungus_delta_15 <- ggplot(data_filtered_fungi_clean, aes(x = year, y = d15N)) 
   geom_smooth(method = "lm", se = FALSE, aes(color = species), linewidth = 1) +
   scale_color_manual(
     values = fungus_colors,
-    breaks = c("S. americanus", "S. ampliporus", "S. clintonianus", "S. luteus", "S. spraguei", "S. weaverae"),
+    breaks = c("S. spraguei", "S. americanus", "S. weaverae", "S. luteus", "S. clintonianus", "S. ampliporus"),
     labels = c(
       "S. americanus" = expression(italic("S. americanus")),
       "S. ampliporus" = expression(italic("S. ampliporus")),
@@ -612,9 +613,10 @@ p_fungus_delta_15 <- ggplot(data_filtered_fungi_clean, aes(x = year, y = d15N)) 
 #convert species to factor to reverse the order in the legend
 data_filtered_fungi_clean$species <- factor(
   data_filtered_fungi_clean$species,
-  levels = rev(c("S. americanus", "S. ampliporus", "S. clintonianus", 
-                 "S. luteus", "S. spraguei", "S. weaverae"))
+  levels = rev(c(species_order <-c("S. spraguei", "S. americanus", "S. weaverae", "S. luteus", "S. clintonianus", "S. ampliporus")
+))
 )
+
 
 #set colors
 d15N_boxplot <- ggplot(data_filtered_fungi_clean, 
@@ -648,12 +650,12 @@ d15N_boxplot
 
 #make a second version wihtout species labels for saving
 
-#convert species to factor to reverse the order in the legend
+#convert species to factor to correrct order in the legend
 data_filtered_fungi_clean$species <- factor(
   data_filtered_fungi_clean$species,
-  levels = rev(c("S. americanus", "S. ampliporus", "S. clintonianus", 
-                 "S. luteus", "S. spraguei", "S. weaverae"))
+  levels = rev(c("S. spraguei", "S. americanus", "S. weaverae", "S. luteus", "S. clintonianus", "S. ampliporus"))
 )
+
 
 #set colors
 d15N_boxplot_nolabs <- ggplot(data_filtered_fungi_clean, 
@@ -730,8 +732,7 @@ summary(slopes, infer=TRUE)
 #convert species to a factor to set order
 data_filtered_fungi_clean$species <- factor(
   data_filtered_fungi_clean$species,
-  levels = c("S. americanus", "S. ampliporus", "S. clintonianus", 
-             "S. luteus", "S. spraguei", "S. weaverae")
+  levels = c("S. spraguei", "S. americanus", "S. weaverae", "S. luteus", "S. clintonianus", "S. ampliporus")
 )
 
 #run separate linear models for each species to get R² values
