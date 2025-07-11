@@ -31,7 +31,7 @@ sessionInfo()
 #set seed for reproducibility
 set.seed(666)
 
-#Set dr 
+#set dr 
 setwd("~/Desktop/Project_N_use")
 
 #set color scheme for species
@@ -46,7 +46,17 @@ fungus_colors <- c(
 
 #read in data
 data<- as.data.frame(fread("data/N_use_bioassay_clean_data.csv", header = TRUE, sep = ",")) #MEROPS BLASTP results
+#add geothite data
+data2<- as.data.frame(fread("data/BSA_Goethite_corrected.csv", header = TRUE, sep = ","))
+
 tree<- read.tree("Suillus.6_taxa.iqtree") #read in tree
+
+dim(data)
+dim(data2)
+
+#combine data with geothite data
+data<- rbind(data, data2)
+dim(data)
 
 #get current raw names
 unique(data$Species)
@@ -64,6 +74,7 @@ unique(data_filtered$Species) #looks good
 df_filtered <- data_filtered %>%
   mutate(Species = case_when(
     Species == "S_clinton" ~ "S. clintonianus",
+    Species == "S_clintonianus" ~ "S. clintonianus", #because geothite data is labeled differently for some reason
     Species == "S_spraguei" ~ "S. spraguei",
     Species == "S_americanus" ~ "S. americanus",
     Species == "S_weaverae" ~ "S. weaverae",
@@ -154,6 +165,8 @@ ammonium_data <- no_control_normalized_filtered %>% filter(Treatment == "Ammoniu
 bsa_data <- no_control_normalized_filtered %>% filter(Treatment == "BSA")
 bsa_tannin_data <- no_control_normalized_filtered %>% filter(Treatment == "BSA-Tannin")
 chitin_data <- no_control_normalized_filtered %>% filter(Treatment == "Chitin")
+bsa_geo_data <- no_control_normalized_filtered %>% filter(Treatment == "BSA-Goethite")
+
 
 # Pre-calculate segment positions for the lollipop plot
 segment_data <- no_control_normalized_filtered %>%
@@ -167,7 +180,7 @@ ammonium_segments <- segment_data %>% filter(Treatment == "Ammonium")
 bsa_segments <- segment_data %>% filter(Treatment == "BSA")
 bsa_tannin_segments <- segment_data %>% filter(Treatment == "BSA-Tannin")
 chitin_segments <- segment_data %>% filter(Treatment == "Chitin")
-
+bsa_geo_segments <- segment_data %>% filter(Treatment == "BSA-Goethite")
 
 
 
@@ -179,10 +192,12 @@ ammonium_max <- 10
 ammonium_breaks <- seq(x_min, ammonium_max, by = 2)
 bsa_max <- 5
 bsa_breaks <- seq(x_min, bsa_max, by = 1)
-bsa_tannin_max <- 2.5
+bsa_tannin_max <- 5
 bsa_tannin_breaks <- seq(x_min, bsa_tannin_max, by = 1)
-chitin_max <- 2.5
+chitin_max <- 5
 chitin_breaks <- seq(x_min, chitin_max, by = 1)
+bsa_geo_max<- 5
+bsa_geo_breaks <- seq(x_min, bsa_geo_max, by = 1)
 
 #create base plot function
 create_panel <- function(data, segments_data, title, x_max, breaks, show_y_labels = FALSE) {
@@ -238,14 +253,15 @@ create_panel <- function(data, segments_data, title, x_max, breaks, show_y_label
 
 #render the plots
 p1 <- create_panel(ammonium_data, ammonium_segments, "Ammonium", ammonium_max, ammonium_breaks, TRUE)
-p2 <- create_panel(bsa_data, bsa_segments, "BSA", bsa_max, bsa_breaks, FALSE)
-p3 <- create_panel(bsa_tannin_data, bsa_tannin_segments, "BSA-Tannin", bsa_tannin_max, bsa_tannin_breaks, FALSE)
+p2 <- create_panel(bsa_data, bsa_segments, "Protein", bsa_max, bsa_breaks, FALSE)
+p3 <- create_panel(bsa_tannin_data, bsa_tannin_segments, "Protein-Tannin", bsa_tannin_max, bsa_tannin_breaks, FALSE)
 p4 <- create_panel(chitin_data, chitin_segments, "Chitin", chitin_max, chitin_breaks, FALSE)
+p5 <- create_panel(bsa_geo_data, bsa_geo_segments, "Protein-Mineral", bsa_geo_max, bsa_geo_breaks, FALSE)
 
 
 #add the legend
 #first combine the 4 plots using patchwork
-top_row <- p1 + p2 + p3 + p4 + plot_layout(ncol = 4)
+top_row <- p1 + p2 + p3 + p5 + p4 + plot_layout(ncol = 5)
 
 #create the legend manually 
 direct_legend <- ggplot() +
@@ -276,7 +292,7 @@ final_plot
 
 #save plot
 #ggsave("bioassay_figure_raw.pdf", final_plot, width = 10, height = 7)
-ggsave("bioassay_figure_raw.pdf.svg", plot = final_plot, width = 10, height = 7)
+ggsave("bioassay_figure_raw.svg", plot = final_plot, width = 10, height = 6)
 
 
 
@@ -293,12 +309,16 @@ no_control_normalized_filtered$Treatment <- as.factor(no_control_normalized_filt
 model <- aov(mass_minus_plug_normalized ~ Species * Treatment, 
              data = no_control_normalized_filtered)
 
+model
 #treatment has a much larger effect than species or species:treatment
 #Terms:
-#  Species Treatment Species:Treatment Residuals
-#Sum of Squares   27.2361  630.9746           46.6174  239.1635
-#Deg. of Freedom        5         3                15       192
+#                 Species Treatment Species:Treatment Residuals
+#Sum of Squares   41.5458  665.4844           57.3437  283.3926
+#Deg. of Freedom        5         4                20       237
 
+#Residual standard error: 1.093503
+#Estimated effects may be unbalanced
+#3 observations deleted due to missingness
 
 #check ANOVA assumptions
 #check residuals for normality
@@ -314,13 +334,14 @@ plot(model, 1)  #residuals vs Fitted plot indicates no serious heteroscedasticit
 Anova(model, type = "III")
 summary(model)
 
-# Df Sum Sq Mean Sq F value   Pr(>F)    
-# Species             5   27.2    5.45   4.373 0.000858 ***
-#   Treatment           3  631.0  210.32 168.848  < 2e-16 ***
-#   Species:Treatment  15   46.6    3.11   2.495 0.002211 ** 
-#   Residuals         192  239.2    1.25                     
-# ---
-#   Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#Df Sum Sq Mean Sq F value   Pr(>F)    
+#Species             5   41.5    8.31   6.949 4.47e-06 ***
+#  Treatment           4  665.5  166.37 139.135  < 2e-16 ***
+#  Species:Treatment  20   57.3    2.87   2.398  0.00101 ** 
+#  Residuals         237  283.4    1.20                     
+#---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+#3 observations deleted due to missingness
 
 
 #now calculate effect sizes (eta squared) to compare the relative importance of species vs treatment
@@ -337,11 +358,11 @@ eta_sq_df <- data.frame(
 )
 eta_sq_df
 
-# Effect Eta_Squared
-# Sum Sq1           Species  0.02885210
-# Sum Sq2         Treatment  0.66841123
-# Sum Sq3 Species:Treatment  0.04938324
-# Sum Sq4         Residuals  0.25335343
+#Effect Eta_Squared
+#Sum Sq1           Species  0.03965174
+#Sum Sq2         Treatment  0.63514575
+#Sum Sq3 Species:Treatment  0.05472948
+#Sum Sq4         Residuals  0.27047303
 
 
 #preform post-hoc tests
@@ -350,15 +371,23 @@ species_emmeans <- emmeans(model, ~ Species)
 species_pairs <- pairs(species_emmeans, adjust = "tukey")
 species_pairs
 
+#view results
+summary(species_emmeans)
+plot(species_emmeans, comparisons = TRUE)
+
 #get treatment effects
 treatment_emmeans <- emmeans(model, ~ Treatment)
 treatment_pairs <- pairs(treatment_emmeans, adjust = "tukey")
 treatment_pairs
 
-#get interaction effecgts (effect of Treatment within each Species)
+
+#get interaction effects (effect of Treatment within each Species)
 interaction_emmeans <- emmeans(model, ~ Treatment | Species)
 interaction_pairs <- pairs(interaction_emmeans, adjust = "tukey")
 interaction_pairs
+
+#look at hierarchies
+pairs(interaction_emmeans, by = "Species")
 
 #summary statistics
 group_means <- no_control_normalized_filtered %>%
@@ -427,3 +456,17 @@ summary(Chitin_model)
 #run post-hoc pairwise comparisons with Tukey adjustment
 Chitin_tukey <- TukeyHSD(Chitin_model)
 print(Chitin_tukey)
+
+
+#look at BSA-Goethite performance: 
+#create a subset of data containing only BSA-Goethite treatment
+BSA_Goethite_subset <- no_control_normalized_filtered %>%
+  filter(Treatment == "BSA-Goethite")
+
+#run a one-way ANOVA for species effect within BSA-Goethite
+BSA_Goethite_model <- aov(mass_minus_plug_normalized ~ Species, data = BSA_Goethite_subset)
+summary(BSA_Goethite_model)
+
+#run post-hoc pairwise comparisons with Tukey adjustment
+BSA_Goethite_tukey <- TukeyHSD(BSA_Goethite_model)
+print(BSA_Goethite_tukey)
